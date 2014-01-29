@@ -451,9 +451,23 @@ class JobQueue(object):
         response_body = '[' + ','.join([job.get_json() for job in job_list]) + ']'
         return make200(start_response, response_body)
 
+    def reset(self):
+        # clear database
+        self.dbconn = psycopg2.connect(self.dsn)
+        cursor = self.dbconn.cursor()
+        cursor.execute('delete from Job');
+        cursor.execute('delete from Worker');
+        self.dbconn.commit()
+
+        # purge message queues
+        self.rabbit_chan.queue_purge(queue='jobs')
+
 class Application(object):
-    def __init__(self, dsn, rabbitmq_host, external_addr):
+    def __init__(self, dsn, rabbitmq_host, external_addr, reset):
         self.job_queue = JobQueue(dsn, rabbitmq_host, external_addr)
+        if reset:
+            self.job_queue.reset()
+
         print('jobqueue running...')
 
     def __call__(self, environ, start_response):
@@ -471,10 +485,12 @@ def main():
     parser.add_argument('--port', type=int, default=8314,
                         help="Port on which to listen")
     parser.add_argument('--rabbitmq-host', default='127.0.0.1:5672',
-                        help="Externally accessible ip address")
+                        help="RabbitMQ server host")
+    parser.add_argument('--reset', action='store_true',
+                        help="Clear database and purge message queue")
     args = parser.parse_args()
 
-    app = Application(args.dsn, args.rabbitmq_host, args.external_addr)
+    app = Application(args.dsn, args.rabbitmq_host, args.external_addr, args.reset)
     httpd = make_server('0.0.0.0', args.port, app)
     httpd.serve_forever()
 

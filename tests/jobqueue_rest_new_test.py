@@ -14,40 +14,13 @@ import unittest
 from wsgiref.simple_server import make_server
 
 import jobqueue
-import util
+from jobqueue_testcase import JobQueueTestCase
 
 RABBITMQ_HOST = 'localhost:5672'
 
-def get_json(response, expectedStatus=200):
-    if response.status != expectedStatus:
-        print('error: bad http status: %d' % response.status)
-        return {}
-
-    text = response.read().decode().strip()
-
-    try:
-        decoded = json.loads(text)
-    except ValueError:
-        print('could not decode: ' + text)
-        return {}
-
-    return decoded
-
-def wait_for_job(rabbit_chan):
-    msg = rabbit_chan.basic_get(queue='jobs', no_ack=True)
-    while not msg:
-        os.sleep(1)
-        print('.')
-        msg = rabbit_chan.basic_get(queue='jobs', no_ack=True)
-
-    if msg:
-        return msg.body
-    else:
-        return None
-
 #TODO: test worker_id stuff
 
-class TestJobQueueREST(unittest.TestCase):
+class TestJobQueueREST(JobQueueTestCase):
 
     # JobQueue server instance running in its own thread
     httpd = None
@@ -100,29 +73,8 @@ class TestJobQueueREST(unittest.TestCase):
       },
     }
 
-    @classmethod
-    def setUpClass(cls):
-        dbpath = 'dbname=jobqueue user=jobqueue host=localhost password=jobqueue'
-        dbconn = psycopg2.connect(dbpath)
-        cursor = dbconn.cursor()
-        cursor.execute('delete from Job');
-        cursor.execute('delete from Worker');
-        dbconn.commit()
-
-        app = jobqueue.Application(dbpath, RABBITMQ_HOST, '127.0.0.1')
-
-        cls.port = util.find_open_port('127.0.0.1', 15707)
-        cls.httpd = make_server('0.0.0.0', cls.port, app)
-        thread = threading.Thread(target=cls.httpd.serve_forever)
-        thread.daemon = True
-        thread.start()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.httpd.shutdown()
-
     def setUp(self):
-        self.conn = http.client.HTTPConnection('localhost', TestJobQueueREST.port)
+        self.conn = http.client.HTTPConnection('localhost', 8315)
 
     def tearDown(self):
         self.conn.close()
@@ -139,14 +91,14 @@ class TestJobQueueREST(unittest.TestCase):
         self.assertEqual(resp.status, 200)
 
         try:
-            res = get_json(resp)
+            res = self.get_json(resp)
         except:
             self.assertTrue(False, "failed to parse json response after posting a new job")
 
         uuid = res['job_id']
 
         self.conn.request('GET', '/0.1.0/jobs?state=PENDING')
-        pending = get_json(self.conn.getresponse())
+        pending = self.get_json(self.conn.getresponse())
 
         found = False
         for u in pending:
@@ -171,7 +123,7 @@ class TestJobQueueREST(unittest.TestCase):
         self.assertEqual(resp.status, 200)
 
         try:
-            res = get_json(resp)
+            res = self.get_json(resp)
         except:
             self.assertTrue(False, "failed to parse json response after posting a new job")
 
@@ -179,7 +131,7 @@ class TestJobQueueREST(unittest.TestCase):
         self.conn.request('GET', '/0.1.0/job/%s' % uuid)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-        job_object = json.loads(get_json(resp)['job_object'])
+        job_object = json.loads(self.get_json(resp)['job_object'])
 
         for field in ['priority', 'max_pending_seconds', 'max_runtime_seconds', 'results_server']:
             self.assertEqual(badjob[field], job_object[field])
@@ -199,14 +151,14 @@ class TestJobQueueREST(unittest.TestCase):
         self.assertEqual(resp.status, 200)
 
         try:
-            res = get_json(resp)
+            res = self.get_json(resp)
         except:
             self.assertTrue(False, "failed to parse json response after posting a new job")
         uuid = res['job_id']
         self.conn.request('GET', '/0.1.0/job/%s' % uuid)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-        job_object = json.loads(get_json(resp)['job_object'])
+        job_object = json.loads(self.get_json(resp)['job_object'])
 
         for field in ['priority', 'max_pending_seconds', 'max_runtime_seconds']:
             self.assertTrue(badjob[field] == job_object[field], "%s != %s due to mismatched types" % (badjob[field], job_object[field]))
@@ -221,7 +173,7 @@ class TestJobQueueREST(unittest.TestCase):
         self.assertEqual(resp.status, 405)
 
         try:
-            res = get_json(resp, 405)
+            res = self.get_json(resp, 405)
         except:
             self.assertTrue(False, "failed to parse json response after posting a new job")
         self.assertTrue(len(res['reason']) > 0, "Job Failed for reason %s" % res['reason'])
@@ -236,7 +188,7 @@ class TestJobQueueREST(unittest.TestCase):
         self.assertEqual(resp.status, 405)
 
         try:
-            res = get_json(resp, 405)
+            res = self.get_json(resp, 405)
         except:
             self.assertTrue(False, "failed to parse json response after posting a new job")
         self.assertTrue(len(res['reason']) > 0, "Job Failed for reason %s" % res['reason'])
@@ -251,7 +203,7 @@ class TestJobQueueREST(unittest.TestCase):
         self.assertEqual(resp.status, 405)
 
         try:
-            res = get_json(resp, 405)
+            res = self.get_json(resp, 405)
         except:
             self.assertTrue(False, "failed to parse json response after posting a new job")
         self.assertTrue(len(res['reason']) > 0, "Job Failed for reason %s" % res['reason'])
@@ -266,7 +218,7 @@ class TestJobQueueREST(unittest.TestCase):
         self.assertEqual(resp.status, 405)
 
         try:
-            res = get_json(resp, 405)
+            res = self.get_json(resp, 405)
         except:
             self.assertTrue(False, "failed to parse json response after posting a new job")
         self.assertTrue(len(res['reason']) > 0, "Job Failed for reason %s" % res['reason'])
