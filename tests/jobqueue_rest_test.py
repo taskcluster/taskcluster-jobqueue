@@ -1,7 +1,4 @@
 from amqplib import client_0_8 as amqp
-import sys
-sys.path.append('../src')
-
 import http.client
 import json
 import psycopg2

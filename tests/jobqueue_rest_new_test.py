@@ -1,6 +1,4 @@
 from amqplib import client_0_8 as amqp
-import sys
-sys.path.append('../src')
 
 import http
 import urllib
@@ -13,7 +11,6 @@ import time
 import unittest
 from wsgiref.simple_server import make_server
 
-import jobqueue
 from jobqueue_testcase import JobQueueTestCase
 
 RABBITMQ_HOST = 'localhost:5672'
