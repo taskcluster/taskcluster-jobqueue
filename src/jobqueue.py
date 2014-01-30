@@ -453,11 +453,12 @@ class JobQueue(object):
 
     def reset(self):
         # clear database
-        self.dbconn = psycopg2.connect(self.dsn)
-        cursor = self.dbconn.cursor()
+        dbconn = psycopg2.connect(self.dsn)
+        cursor = dbconn.cursor()
         cursor.execute('delete from Job');
         cursor.execute('delete from Worker');
-        self.dbconn.commit()
+        dbconn.commit()
+        dbconn.close()
 
         # purge message queues
         self.rabbit_chan.queue_purge(queue='jobs')
