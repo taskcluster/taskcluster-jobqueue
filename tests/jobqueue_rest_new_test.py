@@ -86,11 +86,7 @@ class TestJobQueueREST(JobQueueTestCase):
         self.conn.request("POST", "/0.1.0/job/new", json.dumps(self.job), headers)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-
-        try:
-            res = self.get_json(resp)
-        except:
-            self.assertTrue(False, "failed to parse json response after posting a new job")
+        res = self.get_json(resp)
 
         uuid = res['job_id']
 
@@ -118,11 +114,7 @@ class TestJobQueueREST(JobQueueTestCase):
 
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-
-        try:
-            res = self.get_json(resp)
-        except:
-            self.assertTrue(False, "failed to parse json response after posting a new job")
+        res = self.get_json(resp)
 
         uuid = res['job_id']
         self.conn.request('GET', '/0.1.0/job/%s' % uuid)
@@ -146,11 +138,8 @@ class TestJobQueueREST(JobQueueTestCase):
 
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
+        res = self.get_json(resp)
 
-        try:
-            res = self.get_json(resp)
-        except:
-            self.assertTrue(False, "failed to parse json response after posting a new job")
         uuid = res['job_id']
         self.conn.request('GET', '/0.1.0/job/%s' % uuid)
         resp = self.conn.getresponse()
@@ -168,11 +157,8 @@ class TestJobQueueREST(JobQueueTestCase):
 
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 405)
+        res = self.get_json(resp, 405)
 
-        try:
-            res = self.get_json(resp, 405)
-        except:
-            self.assertTrue(False, "failed to parse json response after posting a new job")
         self.assertTrue(len(res['reason']) > 0, "Job Failed for reason %s" % res['reason'])
 
     def test_new_job_post_invalid_runtime(self):
@@ -183,11 +169,8 @@ class TestJobQueueREST(JobQueueTestCase):
 
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 405)
+        res = self.get_json(resp, 405)
 
-        try:
-            res = self.get_json(resp, 405)
-        except:
-            self.assertTrue(False, "failed to parse json response after posting a new job")
         self.assertTrue(len(res['reason']) > 0, "Job Failed for reason %s" % res['reason'])
 
     def test_new_job_post_invalid_pending(self):
@@ -198,11 +181,8 @@ class TestJobQueueREST(JobQueueTestCase):
 
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 405)
+        res = self.get_json(resp, 405)
 
-        try:
-            res = self.get_json(resp, 405)
-        except:
-            self.assertTrue(False, "failed to parse json response after posting a new job")
         self.assertTrue(len(res['reason']) > 0, "Job Failed for reason %s" % res['reason'])
 
     def test_new_job_post_invalid_server(self):
@@ -213,11 +193,8 @@ class TestJobQueueREST(JobQueueTestCase):
 
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 405)
+        res = self.get_json(resp, 405)
 
-        try:
-            res = self.get_json(resp, 405)
-        except:
-            self.assertTrue(False, "failed to parse json response after posting a new job")
         self.assertTrue(len(res['reason']) > 0, "Job Failed for reason %s" % res['reason'])
 
     def test_new_job_post_invalid_json(self):

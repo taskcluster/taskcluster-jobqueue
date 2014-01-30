@@ -14,11 +14,10 @@ class JobQueueTestCase(unittest.TestCase):
     def get_json(self, response, expected_status=200):
         self.assertEqual(response.status, expected_status)
 
-        text = response.read().decode().strip()
-
         try:
+            text = response.read().decode().strip()
             decoded = json.loads(text)
-        except ValueError:
+        except:
             self.fail('could not parse json')
 
         return decoded
@@ -34,4 +33,6 @@ class JobQueueTestCase(unittest.TestCase):
                 break
 
         self.assertIsNotNone(msg)
+        self.assertIsNotNone(msg.body)
+
         return msg.body

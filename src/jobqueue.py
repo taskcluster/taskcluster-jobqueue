@@ -481,11 +481,11 @@ def main():
     parser.add_argument('--dsn', default='dbname=jobqueue user=jobqueue host=localhost password=jobqueue',
                         help="Postgresql DSN connection string")
     parser.add_argument('--external-addr', default='127.0.0.1',
-                        help="Externally accessible ip address")
+                        help="Externally accessible ip address: host(:port)")
     parser.add_argument('--port', type=int, default=8314,
                         help="Port on which to listen")
     parser.add_argument('--rabbitmq-host', default='127.0.0.1:5672',
-                        help="RabbitMQ server host")
+                        help="RabbitMQ server host(:port)")
     parser.add_argument('--reset', action='store_true',
                         help="Clear database and purge message queue")
     args = parser.parse_args()

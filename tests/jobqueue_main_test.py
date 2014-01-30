@@ -17,6 +17,7 @@ from jobqueue_testcase import JobQueueTestCase
 #       etc. I think these tests are worthwhile in the short term, 
 #       but should be fixed up or turned off in the future.
 
+# This code is taken from mozdevice (devicemanager.py)
 def find_open_port(ip, seed):
     """Gets an open port starting with the seed by incrementing by 1 each time"""
     try:
