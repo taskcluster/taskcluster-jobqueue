@@ -39,7 +39,7 @@ def worker_thread(url, rabbitmq, duration):
             continue
 
         job = json.loads(msg.body)
-        job_id = job.get('job_id', None)
+        job_id = job['job']['job_id']
 
         #TODO: worker id
         conn.request('POST', '/0.1.0/job/{0}/claim'.format(job_id))
@@ -59,7 +59,7 @@ def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default="http://localhost:8314",
                         help="URL of job queue server")
-    parser.add_argument("--rabbitmq", default="localhost:5673",
+    parser.add_argument("--rabbitmq", default="localhost:5672",
                         help="URL of job queue server")
     parser.add_argument("--num-jobs", type=int, default=10,
                         help="Number of jobs to submit")

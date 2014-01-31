@@ -1,8 +1,5 @@
 from amqplib import client_0_8 as amqp
-import sys
-sys.path.append('../src')
-
-import http
+import http.client
 import json
 import psycopg2
 import unittest
@@ -13,77 +10,20 @@ from wsgiref.simple_server import make_server
 import socket
 from urllib.parse import urlparse
 
-import jobqueue
-import util
-
-def get_json(response):
-    if response.status != 200:
-        print('error: bad http status: %d' % response.status)
-        return {}
-
-    text = response.read().decode().strip()
-
-    try:
-        decoded = json.loads(text)
-    except ValueError:
-        print('could not decode: ' + text)
-        return {}
-
-    return decoded
-
-def wait_for_job(rabbit_chan):
-    # TODO: make this more robust
-    msg = rabbit_chan.basic_get(queue='jobs')
-    while not msg:
-        os.sleep(1)
-        msg = rabbit_chan.basic_get(queue='jobs')
-
-    if msg:
-        return msg.body
-    else:
-        return None
+from jobqueue_testcase import JobQueueTestCase
 
 #TODO: test worker_id stuff
 
 RABBITMQ_HOST = 'localhost:5672'
-JOBQUEUE_EXTERNAL_ADDR = '42.42.42.42'
+JOBQUEUE_EXTERNAL_ADDR = '127.0.0.1'
 
-class TestJobQueueREST(unittest.TestCase):
-
-    # JobQueue server instance running in its own thread
-    httpd = None
-
-    @classmethod
-    def setUpClass(cls):
-        dbpath = 'dbname=jobqueue user=jobqueue host=localhost password=jobqueue'
-        dbconn = psycopg2.connect(dbpath)
-        cursor = dbconn.cursor()
-        cursor.execute('delete from Job');
-        cursor.execute('delete from Worker');
-        dbconn.commit()
-
-        app = jobqueue.Application(dbpath, RABBITMQ_HOST, JOBQUEUE_EXTERNAL_ADDR) 
-
-        cls.port = util.find_open_port('127.0.0.1', 15807)
-        cls.httpd = make_server('0.0.0.0', cls.port, app)
-        thread = threading.Thread(target=cls.httpd.serve_forever)
-        thread.daemon = True
-        thread.start()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.httpd.shutdown()
+class TestJobQueueREST(JobQueueTestCase):
 
     def setUp(self):
-        self.conn = http.client.HTTPConnection('localhost', TestJobQueueREST.port)
+        self.conn = http.client.HTTPConnection('localhost', 8315)
         self.job = {'version': '0.1.0'}
 
-        # clear database between tests
-        self.dbconn = psycopg2.connect('dbname=jobqueue user=jobqueue host=localhost password=jobqueue')
-        cursor = self.dbconn.cursor()
-        cursor.execute('delete from Job');
-        cursor.execute('delete from Worker');
-        self.dbconn.commit()
+        self.clear_database('dbname=jobqueue user=jobqueue host=localhost password=jobqueue')
 
         # set up rabbit connection
         self.rabbit_conn = amqp.Connection(host=RABBITMQ_HOST, userid="guest", password="guest", virtual_host="/", insist=False)
@@ -106,14 +46,14 @@ class TestJobQueueREST(unittest.TestCase):
             self.conn.request("POST", "/0.1.0/job/new", json.dumps(self.job), headers)
             resp = self.conn.getresponse()
             self.assertEqual(resp.status, 200)
-            res = get_json(resp)
+            res = self.get_json(resp)
             self.assertIn('job_id', res)
             job = res['job_id']
             jobs.append(job)
 
         # new jobs should appear in jobs list
         self.conn.request('GET', '/0.1.0/jobs')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         res_uuids = [job['job_id'] for job in res]
         for job in jobs:
             self.assertTrue(job in res_uuids)
@@ -121,7 +61,7 @@ class TestJobQueueREST(unittest.TestCase):
         # new job should be pending
         a_job = jobs[0]
         self.conn.request('GET', '/0.1.0/job/' + a_job + '/')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertEqual(res['state'], 'PENDING')
 
     def test_cancel_pending_job(self):
@@ -131,7 +71,7 @@ class TestJobQueueREST(unittest.TestCase):
         self.conn.request("POST", "/0.1.0/job/new", json.dumps(self.job), headers)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-        res = get_json(resp)
+        res = self.get_json(resp)
         a_job = res['job_id']
 
         # cancel job
@@ -141,12 +81,12 @@ class TestJobQueueREST(unittest.TestCase):
 
         # should be finished
         self.conn.request('GET', '/0.1.0/job/' + a_job + '/')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertEqual(res['state'], 'FINISHED')
 
         # should not appear in all jobs
         self.conn.request('GET', '/0.1.0/jobs')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertTrue(a_job not in res)
 
         # can't cancel unknown job uuid
@@ -161,11 +101,11 @@ class TestJobQueueREST(unittest.TestCase):
         self.conn.request("POST", "/0.1.0/job/new", json.dumps(self.job), headers)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-        res = get_json(resp)
+        res = self.get_json(resp)
         a_job = res['job_id']
 
         # claim
-        res = wait_for_job(self.rabbit_chan)
+        res = self.wait_for_job(self.rabbit_chan)
         self.assertIsNot(res, None)
         our_job = json.loads(res)['job']['job_id']
         self.conn.request('POST', '/0.1.0/job/' + our_job + '/claim')
@@ -179,12 +119,12 @@ class TestJobQueueREST(unittest.TestCase):
 
         # should be finished
         self.conn.request('GET', '/0.1.0/job/' + our_job + '/')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertEqual(res['state'], 'FINISHED')
 
         # should not appear in all jobs
         self.conn.request('GET', '/0.1.0/jobs')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertTrue(our_job not in res)
 
         # can't cancel unknown job uuid
@@ -199,11 +139,11 @@ class TestJobQueueREST(unittest.TestCase):
         self.conn.request("POST", "/0.1.0/job/new", json.dumps(self.job), headers)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-        res = get_json(resp)
+        res = self.get_json(resp)
         a_job = res['job_id']
 
         # claim
-        res = wait_for_job(self.rabbit_chan)
+        res = self.wait_for_job(self.rabbit_chan)
         self.assertIsNot(res, None)
         our_job = json.loads(res)['job']['job_id']
         self.conn.request('POST', '/0.1.0/job/' + our_job + '/claim')
@@ -212,17 +152,17 @@ class TestJobQueueREST(unittest.TestCase):
 
         # claimed job should be running
         self.conn.request('GET', '/0.1.0/job/' + our_job + '/')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertEqual(res['state'], 'RUNNING')
 
         # should not be in pending list
         self.conn.request('GET', '/0.1.0/jobs?state=PENDING')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertTrue(our_job not in [job['job_id'] for job in res])
 
         # should be in all jobs running list
         self.conn.request('GET', '/0.1.0/jobs?state=RUNNING')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         print(res)
         self.assertTrue(our_job in [job['job_id'] for job in res])
 
@@ -233,11 +173,11 @@ class TestJobQueueREST(unittest.TestCase):
         self.conn.request("POST", "/0.1.0/job/new", json.dumps(self.job), headers)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-        res = get_json(resp)
+        res = self.get_json(resp)
         a_job = res['job_id']
 
         # claim
-        res = wait_for_job(self.rabbit_chan)
+        res = self.wait_for_job(self.rabbit_chan)
         self.assertIsNot(res, None)
         our_job = json.loads(res)['job']['job_id']
         self.conn.request('POST', '/0.1.0/job/' + our_job + '/claim')
@@ -251,12 +191,12 @@ class TestJobQueueREST(unittest.TestCase):
 
         # should be finished
         self.conn.request('GET', '/0.1.0/job/' + our_job + '/')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertEqual(res['state'], 'FINISHED')
 
         # should no longer be in all jobs running list
         self.conn.request('GET', '/0.1.0/jobs?state=RUNNING')
-        res = get_json(self.conn.getresponse())
+        res = self.get_json(self.conn.getresponse())
         self.assertTrue(our_job not in [job['job_id'] for job in res])
 
         # can't complete bad job uuid
@@ -275,7 +215,7 @@ class TestJobQueueREST(unittest.TestCase):
         self.conn.request("POST", "/0.1.0/job/new", json.dumps(self.job), headers)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-        res = get_json(resp)
+        res = self.get_json(resp)
         a_job = res['job_id']
         self.conn.request('POST', '/0.1.0/job/' + a_job + '/complete')
         resp = self.conn.getresponse()
@@ -293,11 +233,11 @@ class TestJobQueueREST(unittest.TestCase):
         self.conn.request("POST", "/0.1.0/job/new", json.dumps(self.job), headers)
         resp = self.conn.getresponse()
         self.assertEqual(resp.status, 200)
-        res = get_json(resp)
+        res = self.get_json(resp)
         a_job = res['job_id']
 
         # get a job from the queue
-        res = wait_for_job(self.rabbit_chan)
+        res = self.wait_for_job(self.rabbit_chan)
         self.assertIsNot(res, None)
         our_job = json.loads(res)
 

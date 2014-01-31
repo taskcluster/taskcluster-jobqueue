@@ -5,16 +5,16 @@ import re
 import sys
 sys.path.append('../src')
 from jobqueue import Job
+from jobqueue_testcase import JobQueueTestCase
 import unittest
-import util
 
-class TestJob(unittest.TestCase):
+
+class TestJob(JobQueueTestCase):
 
     def setUp(self):
-        self.dbconn = psycopg2.connect('dbname=jobqueue user=jobqueue host=localhost password=jobqueue')
-        cursor = self.dbconn.cursor()
-        cursor.execute('delete from Job');
-        cursor.execute('delete from Worker');
+        self.dsn = 'dbname=jobqueue user=jobqueue host=localhost password=jobqueue'
+        self.dbconn = psycopg2.connect(self.dsn)
+        self.clear_database(self.dsn)
 
     def tearDown(self):
         self.dbconn.close()
