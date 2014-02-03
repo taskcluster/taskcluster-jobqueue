@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.3
 
 import argparse
-from amqplib import client_0_8 as amqp
+import amqp
 import http.client
 import json
 import sys

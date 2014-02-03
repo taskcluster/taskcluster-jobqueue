@@ -1,4 +1,4 @@
-from amqplib import client_0_8 as amqp
+import amqp
 from datetime import datetime
 import json
 import os
@@ -278,9 +278,17 @@ class JobQueue(object):
         # TODO: validate dsn?
         self.dsn = dsn
 
-        # rabbitmq
-        # TODO: add args for other rabbitmq connection parameters
-        self.rabbit_conn = amqp.Connection(host=rabbitmq_host, userid="guest", password="guest", virtual_host="/", insist=False)
+        # rabbitmq (configuration is parsed out from the url)
+        amqp_config = urllib.parse.urlparse(rabbitmq_host)
+
+        print(amqp_config.path[1:] or '/');
+
+        self.rabbit_conn = amqp.Connection(
+                host=amqp_config.hostname,
+                userid=amqp_config.username,
+                password=amqp_config.password,
+                virtual_host=amqp_config.path[1:] or '/');
+
         self.rabbit_chan = self.rabbit_conn.channel()
 
         # TODO: support multiple queues, defined somewhere else
@@ -485,7 +493,7 @@ def main():
                         help="Externally accessible ip address: host(:port)")
     parser.add_argument('--port', type=int, default=8314,
                         help="Port on which to listen")
-    parser.add_argument('--rabbitmq-host', default='127.0.0.1:5672',
+    parser.add_argument('--rabbitmq-host', default='amqp://guest:guest@127.0.0.1:5672/',
                         help="RabbitMQ server host(:port)")
     parser.add_argument('--reset', action='store_true',
                         help="Clear database and purge message queue")

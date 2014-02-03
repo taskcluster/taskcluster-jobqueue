@@ -1,6 +1,8 @@
 taskcluster-jobqueue
 ====================
 
+[![Build Status](https://travis-ci.org/taskcluster/taskcluster-jobqueue.png)](https://travis-ci.org/taskcluster/taskcluster-jobqueue)
+
 Running the Job Queue
 ---------------------
 

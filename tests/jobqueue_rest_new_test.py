@@ -1,5 +1,4 @@
-from amqplib import client_0_8 as amqp
-
+import amqp
 import http
 import urllib
 import copy
